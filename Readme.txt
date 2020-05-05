@@ -1,10 +1,11 @@
 To Install
 
-	Make sure you have the devtools package
-
+	Make sure you have the devtools package. Also you may need to install dependancies if error arise.
+ 
 	library(devtools)
 	install_github("jae0/netmensuration")
 	install_github("brent0/ILTS.sensor") 
+	install_github(""brent0/ILTS.sensor"", INSTALL_opts=c("--no-multiarch"))
 
 To Develop
 
@@ -37,7 +38,9 @@ These call will create and add to:
 	The iltsStats file can be loaded with R and contains a list of detailed stats for each set
 	
 	
-	ERRORS
+	
+ERRORS
+
 	trip 100054290 set 11
 	trip 100054290 set 31
 	trip L09092019 set 4
