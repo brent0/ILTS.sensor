@@ -1,7 +1,16 @@
 To Install
-Make sure you have the devtools package
-require(devtools)
- 
+
+	Make sure you have the devtools package
+
+	library(devtools)
+	install_github("jae0/netmensuration")
+	install_github("brent0/ILTS.sensor") 
+
+To Develop
+
+	In RStudio go to file -> new project -> version controll 
+	enter this url https://github.com/brent0/ILTS.sensor.git
+	let me know so I can add your git account as contributor or you can fork the code for your own project.
 
 To Avoid entering project variables in the dialog prompts, set the following in your Rprofile.site file
 
@@ -37,6 +46,7 @@ These call will create and add to:
 	trip L18092019 set `3
 	
 	100054269 set 16 did plot before did when testing expanded plot
+	L04092019 set 4  did plot before did when testing expanded plot
 	
 	      
 	
