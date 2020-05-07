@@ -5,7 +5,7 @@ To Install
 	library(devtools)
 	install_github("jae0/netmensuration")
 	install_github("brent0/ILTS.sensor") 
-	install_github(""brent0/ILTS.sensor"", INSTALL_opts=c("--no-multiarch"))
+	install_github("brent0/ILTS.sensor", INSTALL_opts=c("--no-multiarch"))
 
 To Develop
 
