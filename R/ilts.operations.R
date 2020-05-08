@@ -4,6 +4,7 @@ assign('manual.archive', "", pkg.env)
 assign('oracle.server', "", pkg.env)
 assign('oracle.user', "", pkg.env)
 assign('oracle.password', "", pkg.env)
+options(stringsAsFactors = F)
 
 #' @title  init.project.vars
 #' @description  Set global database variables by user account
@@ -13,9 +14,9 @@ init.project.vars = function() {
   if(exists("bio.datadirectory.ilts")){
     assign('manual.archive', bio.datadirectory.ilts , pkg.env)
   }
-  else{
+  if(!exists("bio.datadirectory.ilts")){
+    print('A window will open that you need to choose the working folder.')
     assign('manual.archive', gWidgets2::gfile(text = "Select project work directory", type = "selectdir"), pkg.env)
-
   }
 
   #Take from snowcrab users .Rprofile.site
@@ -79,22 +80,28 @@ esonar2df = function(esonar = NULL) {
   return(esonar)
 }
 
-#' @title  get.acoustic.releases
+#' @title  get.oracle.table
 #' @description  Get data from Oracle Database table
-#' @import ROracle DBI
+#' @import ROracle DBI RODBC
 #' @param tn tablename to get
 #' @param oracle.user your oracle username
 #' @param oracle.password your oracle password
 #' @return dataframe
 #' @export
-get.oracle.table = function(tn = "",server = pkg.env$oracle.server, user =pkg.env$oracle.user, password = pkg.env$oracle.password){
+get.oracle.table = function(tn = "",server = pkg.env$oracle.server, user =pkg.env$oracle.user, password = pkg.env$oracle.password, RODBC=F){
   if(tn == "")stop("You must provide a tablename to 'get.oracle.table'!!")
-
+if(!RODBC){
   drv <- dbDriver("Oracle")
   con <- ROracle::dbConnect(drv, username = user, password = password, dbname = server)
   res <- ROracle::dbSendQuery(con, paste("select * from ", tn, sep=""))
   res <- fetch(res)
   ROracle::dbDisconnect(con)
+} 
+if(RODBC)  {
+  drv = odbcConnect(dsn = server ,uid = user, pwd = password)
+  res = sqlQuery(drv,paste("select * from ", tn,";", sep=""))
+  odbcCloseAll()
+  }
   return(res)
 }
 
@@ -107,7 +114,7 @@ get.oracle.table = function(tn = "",server = pkg.env$oracle.server, user =pkg.en
 #' @import netmensuration lubridate
 #' @return list of lists. Format (top to bottom) year-set-data
 #' @export
-ilts.format.merge = function(update = TRUE, user = "", years = ""){
+ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
   #Set up database server, user and password
   init.project.vars()
 
@@ -133,12 +140,19 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
   plotdata = F #Alternative plotting that we do not require
 
   #Pull in the sensor data, this will be formatted and looped thru by trip then set.
-  esona = get.oracle.table(tn = "FRAILC.ILTS_SENSORS_TEMP")
+  if(!use_local) {  esona = get.oracle.table(tn = "FRAILC.ILTS_SENSORS_TEMP", RODBC=use_RODBC)
+                    write.csv(esona,file=file.path(pkg.env$manual.archive, 'raw', 'ILTS_SENSORS_TEMP.csv'),row.names = F)
+                  }      
+  if(use_local)    esona = read.csv(file.path(pkg.env$manual.archive, 'raw', sensor.file))
+  
   esona$GPSTIME[which(nchar(esona$GPSTIME)==5)] = paste("0", esona$GPSTIME[which(nchar(esona$GPSTIME)==5)], sep="")
   esona$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(esona$GPSDATE)), esona$GPSTIME, sep=" "), tz="UTC" )
   esona = esona[ order(esona$timestamp , decreasing = FALSE ),]
   err = which(is.na(esona$timestamp))
-  if(length(err)>0)esona = esona[-err,]
+  if(length(err)>0){
+    cat(paste('Errors in time stamps for TRIP_NO--SETS'),unique(paste(esona$TRIP_ID[err],'--',esona$SET_NO[err],sep="")))
+     esona = esona[-err,]
+    }
   esona$LATITUDE = format.lol(x = esona$LATITUDE)
   esona$LONGITUDE = format.lol(x = esona$LONGITUDE)
   #If specific years desired filter unwanted
@@ -148,18 +162,27 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
     if(length(yind)>0)esona = esona[yind,]
     if(length(esona$timestamp)==0)stop("No data found for your year selection!")
   }
-  mini = get.oracle.table(tn = "FRAILC.MINILOG_TEMP")
+  if(!use_local)  {
+      mini = get.oracle.table(tn = "FRAILC.MINILOG_TEMP", RODBC = use_RODBC)
+      write.csv(mini,file=file.path(pkg.env$manual.archive, 'raw', 'MINILOG_TEMP.csv'),row.names = F)
+    } 
+  if(use_local)    mini = read.csv(file.path(pkg.env$manual.archive, 'raw', minilog.file))
+  
   #rebuild datetime column as it is incorrect and order
   mini$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(mini$TDATE)), mini$TIME, sep=" "), tz="UTC" )
   mini = mini[ order(mini$timestamp , decreasing = FALSE ),]
 
   #seab = get.oracle.table(tn = "LOBSTER.ILTS_TEMPERATURE")
-
-  seabf = get.oracle.table(tn = "FRAILC.ILTS_TEMPERATURE")
+  if(!use_local)    {
+    seabf = get.oracle.table(tn = "FRAILC.ILTS_TEMPERATURE",RODBC = use_RODBC)
+    write.csv(seabf,file=file.path(pkg.env$manual.archive, 'raw', 'ILTS_TEMPERATURE.csv'),row.names = F)
+    }
+  if(use_local)    seabf = read.csv(file.path(pkg.env$manual.archive, 'raw', seabird.file))
+  
   #rebuild datetime column as it is incorrect and order
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
-
+  
   #Loop through each esonar file to convert and merge with temp
   eson = split(esona, esona$TRIP_ID)
   for(i in 1:length(eson)){
@@ -218,7 +241,11 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
             mergset = merge(mergset, timestamp, "timestamp", all = TRUE)
             mergset$timestamp = lubridate::ymd_hms(as.character(mergset$timestamp), tz="UTC" )
             #Find deepest point and extend possible data from that out to 20min on either side
-            aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
+        
+             NoDeps = all(is.na(mergset$depth))
+            if(NoDeps) cat("\n",paste('No depth info for Trip-Setno='),unique(paste(mergset$Trip,mergset$Setno,sep="-")))
+            if(!NoDeps){
+             aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
 
             # Build the variables need for the proper execution of the bottom contact function from
@@ -310,6 +337,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
             }
 
             iltsStats[[paste(unique(na.omit(set$Trip)), unique(na.omit(set$Setno)),sep=".")]] = bc
+           } #end if no depth
           }#END Update clause
         }
       }#END Set subset

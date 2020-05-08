@@ -14,8 +14,9 @@ Imports:
     tcltk,
     gWidgets2, 
     gWidgets2tcltk, 
-    ROracle,
     DBI,
     netmensuration, 
     lubridate, 
-    stringr
+    stringr,
+    RODBC,
+    ROracle
