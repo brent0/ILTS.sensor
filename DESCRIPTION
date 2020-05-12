@@ -18,5 +18,4 @@ Imports:
     netmensuration, 
     lubridate, 
     stringr,
-    RODBC,
-    ROracle
+    RODBC
