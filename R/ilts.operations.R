@@ -13,12 +13,13 @@ options(stringsAsFactors = F)
 init.project.vars = function() {
   if(exists("bio.datadirectory.ilts")){
     assign('manual.archive', bio.datadirectory.ilts , pkg.env)
-  }
+      }
   if(!exists("bio.datadirectory.ilts")){
     print('A window will open that you need to choose the working folder.')
     assign('manual.archive', gWidgets2::gfile(text = "Select project work directory", type = "selectdir"), pkg.env)
-  }
-
+    }
+  dir.create(pkg.env$manual.archive, showWarnings = F)
+  
   #Take from snowcrab users .Rprofile.site
   if(exists("oracle.snowcrab.server")){
     assign('oracle.server', oracle.snowcrab.server, pkg.env)
@@ -140,6 +141,8 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   plotdata = F #Alternative plotting that we do not require
 
   #Pull in the sensor data, this will be formatted and looped thru by trip then set.
+  dir.create(file.path(pkg.env$manual.archive,'raw'), showWarnings = F)
+  
   if(!use_local) {  esona = get.oracle.table(tn = "FRAILC.ILTS_SENSORS_TEMP", RODBC=use_RODBC)
                     write.csv(esona,file=file.path(pkg.env$manual.archive, 'raw', 'ILTS_SENSORS_TEMP.csv'),row.names = F)
                   }      
