@@ -118,6 +118,7 @@ if(RODBC)  {
 ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, depth.only.plot=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
   #Set up database server, user and password
   init.project.vars()
+  options(stringsAsFactors=F)
 
   cont=TRUE
   if(user == "")stop("You must call this function with a user. exa. ilts.format.merge(update = TRUE, user = 'John'" )
@@ -254,6 +255,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
               pdf(file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'pdf',sep=".")))
               with(subset(mergset, !is.na(depth)),plot(timestamp,depth, type='l'))
               dev.off()
+              write.csv(mergset,file=file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'csv',sep=".")))
               next()
             }
             # Build the variables need for the proper execution of the bottom contact function from
