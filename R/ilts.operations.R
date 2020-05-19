@@ -185,7 +185,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   #rebuild datetime column as it is incorrect and order
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
-  browser()
   #Loop through each esonar file to convert and merge with temp
   eson = split(esona, esona$TRIP_ID)
   for(i in 1:length(eson)){
