@@ -115,7 +115,7 @@ if(RODBC)  {
 #' @import netmensuration lubridate
 #' @return list of lists. Format (top to bottom) year-set-data
 #' @export
-ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
+ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, depth.only.plot=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
   #Set up database server, user and password
   init.project.vars()
 
@@ -185,7 +185,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   #rebuild datetime column as it is incorrect and order
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
-  
+  browser()
   #Loop through each esonar file to convert and merge with temp
   eson = split(esona, esona$TRIP_ID)
   for(i in 1:length(eson)){
@@ -251,6 +251,12 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
              aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
 
+            if(depth.only.plot){
+              pdf(file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'pdf',sep=".")))
+              with(subset(mergset, !is.na(depth)),plot(timestamp,depth, type='l'))
+              dev.off()
+              next()
+            }
             # Build the variables need for the proper execution of the bottom contact function from
             # the netmensuration package
             bcp = list(
