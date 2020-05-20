@@ -231,13 +231,14 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
                 names(minisub) = c("temperature","timestamp")
               }
             }
-            if(unique(set$Trip)=="100055173" & unique(set$Setno)==6) browser()
-            
+             
             seabsub = NULL
             #Get seabird indicies and extend ?? mins on either side so that depth profile isn't cut off
             seab.ind.0 = which(seabf$timestamp>set$timestamp[1]-lubridate::minutes(15))[1]
             seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(15))[1]-1
-            if(!(is.na(seab.ind.0) | is.na(seab.ind.0))){
+            if(is.na(seab.ind.1)) seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(4))[1]-1
+            
+               if(!(is.na(seab.ind.0) | is.na(seab.ind.0))){
                seabsub = seabf[c(seab.ind.0:seab.ind.1),]
               seabsub = seabsub[,which(names(seabsub) %in% c("timestamp", "TEMPC", "DEPTHM"))]
               names(seabsub) = c("temperature","depth","timestamp")
@@ -264,14 +265,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
             if(!NoDeps){
              aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
-
-if(depth.only.plot){
-            pdf(file.path(pkg.env$manual.archive,paste(unique(na.omit(mergset$Trip)),unique(na.omit(mergset$Setno)),'pdf', sep=".")))
-                with(subset(mergset,!is.na(depth)),plot(timestamp, depth ,type='l'))
-            dev.off()
-            next()
-                }
-
 
             if(depth.only.plot){
               pdf(file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'pdf',sep=".")))
