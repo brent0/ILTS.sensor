@@ -131,6 +131,7 @@ if(RODBC)  {
 ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, depth.only.plot=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
   #Set up database server, user and password
   init.project.vars()
+  options(stringsAsFactors=F)
 
   cont=TRUE
   if(user == "")stop("You must call this function with a user. exa. ilts.format.merge(update = TRUE, user = 'John'" )
@@ -198,7 +199,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   #rebuild datetime column as it is incorrect and order
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
-  
   #Loop through each esonar file to convert and merge with temp
   eson = split(esona, esona$TRIP_ID)
   
@@ -264,12 +264,23 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
             if(!NoDeps){
              aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
+
 if(depth.only.plot){
             pdf(file.path(pkg.env$manual.archive,paste(unique(na.omit(mergset$Trip)),unique(na.omit(mergset$Setno)),'pdf', sep=".")))
                 with(subset(mergset,!is.na(depth)),plot(timestamp, depth ,type='l'))
             dev.off()
             next()
                 }
+
+
+            if(depth.only.plot){
+              pdf(file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'pdf',sep=".")))
+              with(subset(mergset, !is.na(depth)),plot(timestamp,depth, type='l'))
+              dev.off()
+              write.csv(mergset,file=file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'csv',sep=".")))
+              next()
+            }
+
             # Build the variables need for the proper execution of the bottom contact function from
             # the netmensuration package
             bcp = list(

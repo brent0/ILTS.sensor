@@ -34,6 +34,11 @@ To start determining bottom touchdown, or to redo any previously determined sets
 
 ilts.format.merge(update = TRUE, user = "brent", use_RODBC = F, use_local = F ) #Set user to whatever you like and indicate how you want to access the data.
 
+If you want to get only the depth and timestamp plots for each set run:
+
+ilts.format.merge(update = TRUE, user = "brent", use_RODBC = F, use_local = F,depth.only.plot=T ) 
+
+
 To stop just click the top right x in the plot window at any time
 
 To continue determining bottom touchdown, picking up any uncompleted sets:
