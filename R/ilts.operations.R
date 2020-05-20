@@ -6,6 +6,17 @@ assign('oracle.user', "", pkg.env)
 assign('oracle.password', "", pkg.env)
 options(stringsAsFactors = F)
 
+#' @title rename.df
+#' @description renaming columns
+#' @export
+rename.df = function(x, n0, n1) {
+  if(!length(n0)== length(n1)) stop('length of names and renames need to be the same length')
+  for(i in 1:length(n0)){
+    names(x)[which(names(x)==n0[i])] = n1[i]
+  }
+  return(x)
+}
+
 #' @title  init.project.vars
 #' @description  Set global database variables by user account
 #' @import tcltk gWidgets2 gWidgets2tcltk
@@ -49,8 +60,9 @@ init.project.vars = function() {
 #' @return dataframe
 #' @export
 esonar2df = function(esonar = NULL) {
-  names(esonar)
-  colnames(esonar) = c("CPUDateTime","GPSDate","GPSTime","Latitude","Longitude","Speed","Heading","Validity","TransducerName","SensorName","SensorValue","ErrorCode","Hydrophone","SignalStrength", "setno", "latedit", "trip", "datetime")
+
+  esonar = rename.df(esonar, c( 'CPUDATEANDTIME','GPSTIME','LATITUDE','LONGITUDE','SPEED','HEADING','VALIDITY','TRANSDUCERNAME','SENSORNAME','SENSORVALUE','ERRORCODE','HYDROPHONE','SIGNALSTRENGTH','SET_NO','LATEDIT','TRIP_ID','GPSDATE','timestamp'),
+   c("CPUDateTime","GPSTime","Latitude","Longitude","Speed","Heading","Validity","TransducerName","SensorName","SensorValue","ErrorCode","Hydrophone","SignalStrength", "setno", "latedit", "trip", "GPSDate","datetime"))
 
   esonar$primary = NA  #Headline
   esonar$secondary = NA #Is nothing but may need in file
@@ -76,7 +88,8 @@ esonar2df = function(esonar = NULL) {
   esonar$Validity = NULL
   esonar$ErrorCode = NULL
   esonar$Heading = NULL
-  colnames(esonar) = c("Date","Time","Latitude","Longitude","Speed", "Setno", "latedit","Trip","timestamp", "Primary","Secondary","WingSpread","Roll", "Pitch")
+ esonar = rename.df(esonar, c('GPSTime','Latitude','Longitude','Speed','setno','latedit','trip','GPSDate','datetime','primary','secondary','wingspread','STBDRoll','STBDPitch'),
+                            c("Time","Latitude","Longitude","Speed", "Setno", "latedit","Trip","Date","timestamp", "Primary","Secondary","WingSpread","Roll", "Pitch"))
 
   return(esonar)
 }
@@ -115,7 +128,7 @@ if(RODBC)  {
 #' @import netmensuration lubridate
 #' @return list of lists. Format (top to bottom) year-set-data
 #' @export
-ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
+ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, depth.only.plot=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
   #Set up database server, user and password
   init.project.vars()
 
@@ -177,7 +190,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
 
   #seab = get.oracle.table(tn = "LOBSTER.ILTS_TEMPERATURE")
   if(!use_local)    {
-    seabf = get.oracle.table(tn = "FRAILC.ILTS_TEMPERATURE",RODBC = use_RODBC)
+    seabf = get.oracle.table(tn = "frailc.ILTS_TEMPERATURE",RODBC = use_RODBC)
     write.csv(seabf,file=file.path(pkg.env$manual.archive, 'raw', 'ILTS_TEMPERATURE.csv'),row.names = F)
     }
   if(use_local)    seabf = read.csv(file.path(pkg.env$manual.archive, 'raw', seabird.file))
@@ -188,6 +201,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   
   #Loop through each esonar file to convert and merge with temp
   eson = split(esona, esona$TRIP_ID)
+  
   for(i in 1:length(eson)){
     if(cont){ #Condition fails if program exited
       trip = data.frame(eson[[i]])
@@ -196,7 +210,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
         if(cont){ #Condition fails if program exited
           set = data.frame(trip[[j]])
           set = esonar2df(set)
-
           #Dont continue if update is false and station is already complete
 
           if((paste(unique(na.omit(set$Setno)), unique(na.omit(set$Trip)), sep = ".") %in% paste(current$station, current$trip, sep = ".")) & (update==FALSE)){
@@ -218,20 +231,21 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
                 names(minisub) = c("temperature","timestamp")
               }
             }
-
+            if(unique(set$Trip)=="100055173" & unique(set$Setno)==6) browser()
+            
             seabsub = NULL
             #Get seabird indicies and extend ?? mins on either side so that depth profile isn't cut off
             seab.ind.0 = which(seabf$timestamp>set$timestamp[1]-lubridate::minutes(15))[1]
             seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(15))[1]-1
-
             if(!(is.na(seab.ind.0) | is.na(seab.ind.0))){
-
-              seabsub = seabf[c(seab.ind.0:seab.ind.1),]
+               seabsub = seabf[c(seab.ind.0:seab.ind.1),]
               seabsub = seabsub[,which(names(seabsub) %in% c("timestamp", "TEMPC", "DEPTHM"))]
               names(seabsub) = c("temperature","depth","timestamp")
+              }
+            if(is.null(seabsub) && is.null(minisub)){
+              print(paste("No temperature/depth file found for trip - set:  ", unique(na.omit(set$Trip)), " - ", unique(na.omit(set$Setno)), sep=""))
+              next()
             }
-
-            if(is.null(seabsub) && is.null(minisub))stop(paste("No temperature/depth file found for trip - set:  ", unique(na.omit(set$Trip)), " - ", unique(na.omit(set$Setno)), sep=""))
             if(is.null(seabsub)) seabsub = minisub
             #Remove depths = <0 #Not sure why but came accross stations with low depth values mixed in with real bottom depths.
             seabsub$depth[which(seabsub$depth <= 2)] = NA
@@ -250,7 +264,12 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
             if(!NoDeps){
              aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
-
+if(depth.only.plot){
+            pdf(file.path(pkg.env$manual.archive,paste(unique(na.omit(mergset$Trip)),unique(na.omit(mergset$Setno)),'pdf', sep=".")))
+                with(subset(mergset,!is.na(depth)),plot(timestamp, depth ,type='l'))
+            dev.off()
+            next()
+                }
             # Build the variables need for the proper execution of the bottom contact function from
             # the netmensuration package
             bcp = list(
