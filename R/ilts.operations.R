@@ -179,15 +179,15 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
     if(length(yind)>0)esona = esona[yind,]
     if(length(esona$timestamp)==0)stop("No data found for your year selection!")
   }
-  if(!use_local)  {
-      mini = get.oracle.table(tn = "FRAILC.MINILOG_TEMP", RODBC = use_RODBC)
-      write.csv(mini,file=file.path(pkg.env$manual.archive, 'raw', 'MINILOG_TEMP.csv'),row.names = F)
-    } 
-  if(use_local)    mini = read.csv(file.path(pkg.env$manual.archive, 'raw', minilog.file))
+  #if(!use_local)  {
+  #    mini = get.oracle.table(tn = "FRAILC.MINILOG_TEMP", RODBC = use_RODBC)
+  #    write.csv(mini,file=file.path(pkg.env$manual.archive, 'raw', 'MINILOG_TEMP.csv'),row.names = F)
+  #  } 
+  #if(use_local)    mini = read.csv(file.path(pkg.env$manual.archive, 'raw', minilog.file))
   
   #rebuild datetime column as it is incorrect and order
-  mini$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(mini$TDATE)), mini$TIME, sep=" "), tz="UTC" )
-  mini = mini[ order(mini$timestamp , decreasing = FALSE ),]
+  #mini$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(mini$TDATE)), mini$TIME, sep=" "), tz="UTC" )
+  #mini = mini[ order(mini$timestamp , decreasing = FALSE ),]
 
   #seab = get.oracle.table(tn = "LOBSTER.ILTS_TEMPERATURE")
   if(!use_local)    {
@@ -197,10 +197,17 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   if(use_local)    seabf = read.csv(file.path(pkg.env$manual.archive, 'raw', seabird.file))
   
   #rebuild datetime column as it is incorrect and order
+  seabf$UTCTIME[which(nchar(seabf$UTCTIME)==5)] = paste("0", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==5)], sep="")
+  seabf$UTCTIME[which(nchar(seabf$UTCTIME)==4)] = paste("00", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==4)], sep="")
+  seabf$UTCTIME[which(nchar(seabf$UTCTIME)==3)] = paste("000", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==3)], sep="")
+  seabf$UTCTIME[which(nchar(seabf$UTCTIME)==2)] = paste("0000", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==2)], sep="")
+  seabf$UTCTIME[which(nchar(seabf$UTCTIME)==1)] = paste("00000", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==1)], sep="")
+  
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
   #Loop through each esonar file to convert and merge with temp
   eson = split(esona, esona$TRIP_ID)
+  seabf$id = paste(seabf$TRIP_ID,seabf$SET_NO,sep="_")
   
   for(i in 1:length(eson)){
     if(cont){ #Condition fails if program exited
@@ -210,56 +217,61 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
         if(cont){ #Condition fails if program exited
           set = data.frame(trip[[j]])
           set = esonar2df(set)
+          set$id = paste(set$Trip, set$Setno, sep="_")
+          sseab = subset(seabf, id == na.omit(unique(set$id))) 
+          sseab = sseab[order(sseab$timestamp),]
           #Dont continue if update is false and station is already complete
 
           if((paste(unique(na.omit(set$Setno)), unique(na.omit(set$Trip)), sep = ".") %in% paste(current$station, current$trip, sep = ".")) & (update==FALSE)){
             message(paste("Set:",unique(na.omit(set$Setno))," Trip:", unique(na.omit(set$Trip)), " Already added call with update = TRUE to redo.", sep = ""))
           } else{
-            minisub = NULL
-            mini.ind.0 = which(mini$timestamp>set$timestamp[1])[1]
-            mini.ind.1 = which(mini$timestamp>set$timestamp[length(set$timestamp)])[1]-1
-            if(!(is.na(mini.ind.0) | is.na(mini.ind.0))){
-              minisub = mini[c(mini.ind.0:mini.ind.1),]
+         #   minisub = NULL
+        #    mini.ind.0 = which(mini$timestamp>set$timestamp[1])[1]
+        #    mini.ind.1 = which(mini$timestamp>set$timestamp[length(set$timestamp)])[1]-1
+        #    if(!(is.na(mini.ind.0) | is.na(mini.ind.0))){
+        #      minisub = mini[c(mini.ind.0:mini.ind.1),]
               #### Only keep relevant data, If you encounter a minilog file
               #    depth, add that column to the following line to catch that case
-              if("depth" %in% names(minisub)){
-                minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C", "depth"))]
-                names(minisub) = c("temperature","depth","timestamp")
-              }
-              else{
-                minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C"))]
-                names(minisub) = c("temperature","timestamp")
-              }
-            }
-             
-            seabsub = NULL
+        #      if("depth" %in% names(minisub)){
+        #        minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C", "depth"))]
+        #        names(minisub) = c("temperature","depth","timestamp")
+        #      }
+        #      else{
+         #       minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C"))]
+        #        names(minisub) = c("temperature","timestamp")
+         #     }
+         #   }
+             seabsub = NULL
             #Get seabird indicies and extend ?? mins on either side so that depth profile isn't cut off
-            seab.ind.0 = which(seabf$timestamp>set$timestamp[1]-lubridate::minutes(15))[1]
-            seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(15))[1]-1
-            if(is.na(seab.ind.1)) seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(4))[1]-1
+            #seab.ind.0 = which(seabf$timestamp>set$timestamp[1]-lubridate::minutes(15))[1]
+            #seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(15))[1]-1
+            #if(is.na(seab.ind.1)) seab.ind.1 = which(seabf$timestamp>set$timestamp[length(set$timestamp)]+lubridate::minutes(4))[1]-1
             
-               if(!(is.na(seab.ind.0) | is.na(seab.ind.0))){
-               seabsub = seabf[c(seab.ind.0:seab.ind.1),]
-              seabsub = seabsub[,which(names(seabsub) %in% c("timestamp", "TEMPC", "DEPTHM"))]
+            #   if(!(is.na(seab.ind.0) | is.na(seab.ind.0))){
+            #   seabsub = seabf[c(seab.ind.0:seab.ind.1),]
+            seabsub = sseab
+               seabsub = seabsub[,which(names(seabsub) %in% c("timestamp", "TEMPC", "DEPTHM"))]
               names(seabsub) = c("temperature","depth","timestamp")
-              }
-            if(is.null(seabsub) && is.null(minisub)){
+            #  }
+            if(is.null(seabsub)){ #&& is.null(minisub)){
               print(paste("No temperature/depth file found for trip - set:  ", unique(na.omit(set$Trip)), " - ", unique(na.omit(set$Setno)), sep=""))
               next()
             }
-            if(is.null(seabsub)) seabsub = minisub
+            #if(is.null(seabsub)) seabsub = minisub
             #Remove depths = <0 #Not sure why but came accross stations with low depth values mixed in with real bottom depths.
             seabsub$depth[which(seabsub$depth <= 2)] = NA
-
+            mergset = NULL
             #Merge sensor data.
             mergset = merge(seabsub, set, "timestamp", all = TRUE)
             #Build the full, unbroken timeseries and merge
-            timestamp = data.frame(seq(min(mergset$timestamp), max(mergset$timestamp), 1))
+             timestamp = data.frame(seq(min(mergset$timestamp), max(mergset$timestamp), 1))
             names(timestamp) = c("timestamp")
             mergset = merge(mergset, timestamp, "timestamp", all = TRUE)
             mergset$timestamp = lubridate::ymd_hms(as.character(mergset$timestamp), tz="UTC" )
             #Find deepest point and extend possible data from that out to 20min on either side
-        
+           print(paste(unique(mergset$Trip), unique(mergset$Setno)))
+            
+            if(all(na.omit(unique(mergset$Trip))=='100051989' && na.omit(unique(mergset$Setno))==102))browser()
              NoDeps = all(is.na(mergset$depth))
             if(NoDeps) cat("\n",paste('No depth info for Trip-Setno='),unique(paste(mergset$Trip,mergset$Setno,sep="-")))
             if(!NoDeps){
