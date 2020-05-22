@@ -202,7 +202,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   seabf$UTCTIME[which(nchar(seabf$UTCTIME)==3)] = paste("000", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==3)], sep="")
   seabf$UTCTIME[which(nchar(seabf$UTCTIME)==2)] = paste("0000", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==2)], sep="")
   seabf$UTCTIME[which(nchar(seabf$UTCTIME)==1)] = paste("00000", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==1)], sep="")
-  
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
   #Loop through each esonar file to convert and merge with temp
@@ -269,11 +268,13 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
             mergset = merge(mergset, timestamp, "timestamp", all = TRUE)
             mergset$timestamp = lubridate::ymd_hms(as.character(mergset$timestamp), tz="UTC" )
             #Find deepest point and extend possible data from that out to 20min on either side
-           print(paste(unique(mergset$Trip), unique(mergset$Setno)))
             
-            if(all(na.omit(unique(mergset$Trip))=='100051989' && na.omit(unique(mergset$Setno))==102))browser()
              NoDeps = all(is.na(mergset$depth))
-            if(NoDeps) cat("\n",paste('No depth info for Trip-Setno='),unique(paste(mergset$Trip,mergset$Setno,sep="-")))
+            if(NoDeps) {
+              cat("\n",paste('No depth info for Trip-Setno='),unique(paste(mergset$Trip,mergset$Setno,sep="-")))
+              write.csv(mergset,file=file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'csv',sep=".")))
+      
+              }
             if(!NoDeps){
              aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
