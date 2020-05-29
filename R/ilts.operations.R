@@ -128,7 +128,7 @@ if(RODBC)  {
 #' @import netmensuration lubridate
 #' @return list of lists. Format (top to bottom) year-set-data
 #' @export
-ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, depth.only.plot=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
+ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, use_local=F, depth.plot=F,temperature.plot=F, sensor.file='ILTS_SENSORS_TEMP.csv', minilog.file = 'MINILOG_TEMP.csv', seabird.file = 'ILTS_TEMPERATURE.csv'){
   #Set up database server, user and password
   init.project.vars()
   options(stringsAsFactors=F)
@@ -163,9 +163,15 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
   if(use_local)    esona = read.csv(file.path(pkg.env$manual.archive, 'raw', sensor.file))
   
   esona$GPSTIME[which(nchar(esona$GPSTIME)==5)] = paste("0", esona$GPSTIME[which(nchar(esona$GPSTIME)==5)], sep="")
+  esona$GPSTIME[which(nchar(esona$GPSTIME)==5)] = paste("0", esona$GPSTIME[which(nchar(esona$GPSTIME)==5)], sep="")
+  esona$GPSTIME[which(nchar(esona$GPSTIME)==4)] = paste("00", esona$GPSTIME[which(nchar(esona$GPSTIME)==4)], sep="")
+  esona$GPSTIME[which(nchar(esona$GPSTIME)==3)] = paste("000", esona$GPSTIME[which(nchar(esona$GPSTIME)==3)], sep="")
+  esona$GPSTIME[which(nchar(esona$GPSTIME)==2)] = paste("0000", esona$GPSTIME[which(nchar(esona$GPSTIME)==2)], sep="")
+  esona$GPSTIME[which(nchar(esona$GPSTIME)==1)] = paste("00000", esona$GPSTIME[which(nchar(esona$GPSTIME)==1)], sep="")
+  
   esona$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(esona$GPSDATE)), esona$GPSTIME, sep=" "), tz="UTC" )
   esona = esona[ order(esona$timestamp , decreasing = FALSE ),]
-  err = which(is.na(esona$timestamp))
+   err = which(is.na(esona$timestamp))
   if(length(err)>0){
     cat(paste('Errors in time stamps for TRIP_NO--SETS'),unique(paste(esona$TRIP_ID[err],'--',esona$SET_NO[err],sep="")))
      esona = esona[-err,]
@@ -195,7 +201,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
     write.csv(seabf,file=file.path(pkg.env$manual.archive, 'raw', 'ILTS_TEMPERATURE.csv'),row.names = F)
     }
   if(use_local)    seabf = read.csv(file.path(pkg.env$manual.archive, 'raw', seabird.file))
-  
   #rebuild datetime column as it is incorrect and order
   seabf$UTCTIME[which(nchar(seabf$UTCTIME)==5)] = paste("0", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==5)], sep="")
   seabf$UTCTIME[which(nchar(seabf$UTCTIME)==4)] = paste("00", seabf$UTCTIME[which(nchar(seabf$UTCTIME)==4)], sep="")
@@ -224,22 +229,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
           if((paste(unique(na.omit(set$Setno)), unique(na.omit(set$Trip)), sep = ".") %in% paste(current$station, current$trip, sep = ".")) & (update==FALSE)){
             message(paste("Set:",unique(na.omit(set$Setno))," Trip:", unique(na.omit(set$Trip)), " Already added call with update = TRUE to redo.", sep = ""))
           } else{
-         #   minisub = NULL
-        #    mini.ind.0 = which(mini$timestamp>set$timestamp[1])[1]
-        #    mini.ind.1 = which(mini$timestamp>set$timestamp[length(set$timestamp)])[1]-1
-        #    if(!(is.na(mini.ind.0) | is.na(mini.ind.0))){
-        #      minisub = mini[c(mini.ind.0:mini.ind.1),]
-              #### Only keep relevant data, If you encounter a minilog file
-              #    depth, add that column to the following line to catch that case
-        #      if("depth" %in% names(minisub)){
-        #        minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C", "depth"))]
-        #        names(minisub) = c("temperature","depth","timestamp")
-        #      }
-        #      else{
-         #       minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C"))]
-        #        names(minisub) = c("temperature","timestamp")
-         #     }
-         #   }
              seabsub = NULL
             #Get seabird indicies and extend ?? mins on either side so that depth profile isn't cut off
             #seab.ind.0 = which(seabf$timestamp>set$timestamp[1]-lubridate::minutes(15))[1]
@@ -252,7 +241,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
                seabsub = seabsub[,which(names(seabsub) %in% c("timestamp", "TEMPC", "DEPTHM"))]
               names(seabsub) = c("temperature","depth","timestamp")
             #  }
-            if(is.null(seabsub)){ #&& is.null(minisub)){
+            if(is.null(seabsub)){
               print(paste("No temperature/depth file found for trip - set:  ", unique(na.omit(set$Trip)), " - ", unique(na.omit(set$Setno)), sep=""))
               next()
             }
@@ -269,6 +258,18 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
             mergset$timestamp = lubridate::ymd_hms(as.character(mergset$timestamp), tz="UTC" )
             #Find deepest point and extend possible data from that out to 20min on either side
             
+            NoT = all(is.na(mergset$temperature))
+            if(NoT) {
+              cat("\n",paste('No temperature info for Trip-Setno='),unique(paste(mergset$Trip,mergset$Setno,sep="-")))
+            }
+            if(!NoT){
+              if(temperature.plot){
+                pdf(file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'Temperature.pdf',sep=".")))
+                with(subset(mergset, !is.na(temperature)),plot(timestamp,temperature, type='l'))
+                dev.off()
+              }
+            }
+            
              NoDeps = all(is.na(mergset$depth))
             if(NoDeps) {
               cat("\n",paste('No depth info for Trip-Setno='),unique(paste(mergset$Trip,mergset$Setno,sep="-")))
@@ -279,7 +280,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = "", use_RODBC=F, 
              aredown = mergset$timestamp[which(mergset$depth == max(mergset$depth, na.rm = T))]
             time.gate =  list( t0=as.POSIXct(aredown)-lubridate::dminutes(20), t1=as.POSIXct(aredown)+lubridate::dminutes(20) )
 
-            if(depth.only.plot){
+            if(depth.plot){
               pdf(file.path(pkg.env$manual.archive, paste(unique(na.omit(mergset$Trip)), unique(na.omit(mergset$Setno)), 'pdf',sep=".")))
               with(subset(mergset, !is.na(depth)),plot(timestamp,depth, type='l'))
               dev.off()
