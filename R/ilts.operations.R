@@ -1,9 +1,12 @@
+## NOTE: install dependancies (see Readme)
+
+library(devtools)
 
 pkg.env = new.env(parent = emptyenv())
 assign('manual.archive', "", pkg.env)
-assign('oracle.server', "", pkg.env)
-assign('oracle.user', "", pkg.env)
-assign('oracle.password', "", pkg.env)
+assign('oracle.server', oracle.personal.server, pkg.env)
+assign('oracle.user', oracle.personal.user, pkg.env)
+assign('oracle.password', oracle.personal.password, pkg.env)
 
 #' @title  init.project.vars
 #' @description  Set global database variables by user account
@@ -25,10 +28,10 @@ init.project.vars = function() {
     assign('oracle.password', oracle.snowcrab.password, pkg.env)
   }
   #Take from lobster users .Rprofile.site, CHANGE TO WHAT IT IS ACTUALLY CALLED
-  if(exists("oracle.lobster.server")){
-    assign('oracle.server', oracle.lobster.server, pkg.env)
-    assign('oracle.user', oracle.lobster.user, pkg.env)
-    assign('oracle.password', oracle.lobster.password, pkg.env)
+  if(exists("oracle.personal.server")){
+    assign('oracle.server', oracle.personal.server, pkg.env)
+    assign('oracle.user', oracle.personal.user, pkg.env)
+    assign('oracle.password', oracle.personal.password, pkg.env)
   }
   #If still not set prompt for values
   if(pkg.env$oracle.server == ""){
@@ -48,7 +51,7 @@ init.project.vars = function() {
 #' @export
 esonar2df = function(esonar = NULL) {
   names(esonar)
-  colnames(esonar) = c("CPUDateTime","GPSDate","GPSTime","Latitude","Longitude","Speed","Heading","Validity","TransducerName","SensorName","SensorValue","ErrorCode","Hydrophone","SignalStrength", "setno", "latedit", "trip", "datetime")
+  #colnames(esonar) = c("CPUDateTime","GPSDate","GPSTime","Latitude","Longitude","Speed","Heading","Validity","TransducerName","SensorName","SensorValue","ErrorCode","Hydrophone","SignalStrength", "setno", "latedit", "trip", "datetime")
 
   esonar$primary = NA  #Headline
   esonar$secondary = NA #Is nothing but may need in file
@@ -65,15 +68,20 @@ esonar2df = function(esonar = NULL) {
   esonar$STBDRoll[which(esonar$SensorName == "STBDRoll")] = esonar$SensorValue[which(esonar$SensorName == "STBDRoll")]
   esonar$STBDPitch[which(esonar$SensorName == "STBDPitch")] = esonar$SensorValue[which(esonar$SensorName == "STBDPitch")]
 
-  esonar$CPUDateTime = NULL
-  esonar$TransducerName = NULL
-  esonar$SensorName = NULL
-  esonar$SensorValue = NULL
-  esonar$Hydrophone = NULL
-  esonar$SignalStrength = NULL
-  esonar$Validity = NULL
-  esonar$ErrorCode = NULL
-  esonar$Heading = NULL
+  esonar$CPUDATETIME = NULL
+  esonar$TRANSDUCERNAME = NULL
+  esonar$SENSORNAME = NULL
+  esonar$SENSORVALUE = NULL
+  esonar$HYDROPHONE = NULL
+  esonar$SIGNALSTRENGTH = NULL
+  esonar$VALIDITY = NULL
+  esonar$ERRORCODE = NULL
+  esonar$HEADING = NULL
+
+
+  esonar <- esonar %>% select(GPSDATE,GPSTIME,LATITUDE,LONGITUDE,SPEED,SET_NO,DDLAT,TRIP_ID,timestamp,primary,secondary,wingspread,STBDRoll,STBDPitch)
+  #####NOTE: DDLAT is probably the wrong column but didn't know what "latedit" was supposed to be so used DDLAT to fill that space, but doesn't seem to affect running of function - Geraint E.
+
   colnames(esonar) = c("Date","Time","Latitude","Longitude","Speed", "Setno", "latedit","Trip","timestamp", "Primary","Secondary","WingSpread","Roll", "Pitch")
 
   return(esonar)
@@ -90,10 +98,11 @@ esonar2df = function(esonar = NULL) {
 get.oracle.table = function(tn = "",server = pkg.env$oracle.server, user =pkg.env$oracle.user, password = pkg.env$oracle.password){
   if(tn == "")stop("You must provide a tablename to 'get.oracle.table'!!")
 
-  drv <- dbDriver("Oracle")
+
+  drv <- ROracle::Oracle()
   con <- ROracle::dbConnect(drv, username = user, password = password, dbname = server)
   res <- ROracle::dbSendQuery(con, paste("select * from ", tn, sep=""))
-  res <- fetch(res)
+  res <- ROracle::fetch(res)
   ROracle::dbDisconnect(con)
   return(res)
 }
@@ -139,6 +148,19 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
   esona = esona[ order(esona$timestamp , decreasing = FALSE ),]
   err = which(is.na(esona$timestamp))
   if(length(err)>0)esona = esona[-err,]
+
+  ##### Addition to solve LATITUDE data logging issues - Geraint E.
+  library(tidyr)
+  library(dplyr)
+  esona = esona %>% mutate(LATITUDE = ifelse(substr(LATITUDE,5,5) %in% " ", paste0(substr(LATITUDE,1,4),substr(LATITUDE,6,nchar(LATITUDE))),
+                                             ifelse(substr(LATITUDE,6,6) %in% " ", paste0(substr(LATITUDE,1,5),substr(LATITUDE,7,nchar(LATITUDE))),LATITUDE)))
+  esona <- esona %>% mutate(LATITUDE = gsub("n","N",LATITUDE)) %>% mutate(LATITUDE = gsub("F","N",LATITUDE))
+  esona = separate(esona, LATITUDE, c("a","b","c"), " ", remove = FALSE)
+  esona <- esona %>% filter(!(b %in% ""))
+  #test4 = esona %>% filter(!(c %in% "N"))
+  esona <- esona %>% select(-a,-b,-c)
+
+  #####
   esona$LATITUDE = format.lol(x = esona$LATITUDE)
   esona$LONGITUDE = format.lol(x = esona$LONGITUDE)
   #If specific years desired filter unwanted
@@ -330,7 +352,6 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
 #' @export
 format.lol = function(x = NULL){
   if(is.null(x))stop("You must specify values: x")
-
   x = as.character(x)
   x = matrix(unlist(strsplit(x, " ")), ncol = 3, byrow = T)
   rx = as.numeric(x[,1]) + (as.numeric(x[,2])/60)
@@ -339,3 +360,8 @@ format.lol = function(x = NULL){
   }
   return(rx)
 }
+
+#####Execute
+
+ilts.format.merge(update = TRUE, user = "geraint", years = "2019" )
+

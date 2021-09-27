@@ -1,15 +1,17 @@
 To Install
 
 	Make sure you have the devtools package. Also you may need to install dependancies if error arise.
- 
+
 	library(devtools)
 	install_github("jae0/netmensuration")
-	install_github("brent0/ILTS.sensor") 
+	install_github("brent0/ILTS.sensor")
 	install_github("brent0/ILTS.sensor", INSTALL_opts=c("--no-multiarch"))
+	install.packages("dplyr")
+	install.packages("tidyr")
 
 To Develop
 
-	In RStudio go to file -> new project -> version controll 
+	In RStudio go to file -> new project -> version controll
 	enter this url https://github.com/brent0/ILTS.sensor.git
 	let me know so I can add your git account as contributor or you can fork the code for your own project.
 
@@ -36,9 +38,9 @@ These call will create and add to:
 	clicktouchdown_brent.csv AND iltsStats_brent.RDATA
 	The clicktouchdown file will contain rows with start and end times by set
 	The iltsStats file can be loaded with R and contains a list of detailed stats for each set
-	
-	
-	
+
+
+
 ERRORS
 
 	trip 100054290 set 11
@@ -47,9 +49,9 @@ ERRORS
 	trip L12092019 set 8
 	trip L17092019 set 7
 	trip L18092019 set `3
-	
+
 	100054269 set 16 did plot before did when testing expanded plot
 	L04092019 set 4  did plot before did when testing expanded plot
-	
-	      
-	
+
+
+
