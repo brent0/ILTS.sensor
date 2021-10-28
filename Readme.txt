@@ -6,8 +6,7 @@ To Install
 	install_github("jae0/netmensuration")
 	install_github("brent0/ILTS.sensor")
 	install_github("brent0/ILTS.sensor", INSTALL_opts=c("--no-multiarch"))
-	install.packages("dplyr")
-	install.packages("tidyr")
+	install.packages("tidyverse")
 
 To Develop
 
