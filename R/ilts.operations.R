@@ -142,7 +142,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
   plotdata = F #Alternative plotting that we do not require
 
   #Pull in the sensor data, this will be formatted and looped thru by trip then set.
-  esona = get.oracle.table(tn = "FRAILC.ILTS_SENSORS_TEMP")
+  esona = get.oracle.table(tn = "LOBSTER.ILTS_SENSORS")
   esona$GPSTIME[which(nchar(esona$GPSTIME)==5)] = paste("0", esona$GPSTIME[which(nchar(esona$GPSTIME)==5)], sep="")
   esona$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(esona$GPSDATE)), esona$GPSTIME, sep=" "), tz="UTC" )
   esona = esona[ order(esona$timestamp , decreasing = FALSE ),]
@@ -170,14 +170,14 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
     if(length(yind)>0)esona = esona[yind,]
     if(length(esona$timestamp)==0)stop("No data found for your year selection!")
   }
-  mini = get.oracle.table(tn = "FRAILC.MINILOG_TEMP")
-  #rebuild datetime column as it is incorrect and order
-  mini$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(mini$TDATE)), mini$TIME, sep=" "), tz="UTC" )
-  mini = mini[ order(mini$timestamp , decreasing = FALSE ),]
+  # mini = get.oracle.table(tn = "FRAILC.MINILOG_TEMP")
+  # #rebuild datetime column as it is incorrect and order
+  # mini$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(mini$TDATE)), mini$TIME, sep=" "), tz="UTC" )
+  # mini = mini[ order(mini$timestamp , decreasing = FALSE ),]
 
   #seab = get.oracle.table(tn = "LOBSTER.ILTS_TEMPERATURE")
 
-  seabf = get.oracle.table(tn = "FRAILC.ILTS_TEMPERATURE")
+  seabf = get.oracle.table(tn = "LOBSTER.ILTS_TEMPERATURE")
   #rebuild datetime column as it is incorrect and order
   seabf$timestamp = lubridate::ymd_hms(paste(as.character(lubridate::date(seabf$UTCDATE)), seabf$UTCTIME, sep=" "), tz="UTC" )
   seabf = seabf[ order(seabf$timestamp , decreasing = FALSE ),]
@@ -198,22 +198,22 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
           if((paste(unique(na.omit(set$Setno)), unique(na.omit(set$Trip)), sep = ".") %in% paste(current$station, current$trip, sep = ".")) & (update==FALSE)){
             message(paste("Set:",unique(na.omit(set$Setno))," Trip:", unique(na.omit(set$Trip)), " Already added call with update = TRUE to redo.", sep = ""))
           } else{
-            minisub = NULL
-            mini.ind.0 = which(mini$timestamp>set$timestamp[1])[1]
-            mini.ind.1 = which(mini$timestamp>set$timestamp[length(set$timestamp)])[1]-1
-            if(!(is.na(mini.ind.0) | is.na(mini.ind.0))){
-              minisub = mini[c(mini.ind.0:mini.ind.1),]
-              #### Only keep relevant data, If you encounter a minilog file
-              #    depth, add that column to the following line to catch that case
-              if("depth" %in% names(minisub)){
-                minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C", "depth"))]
-                names(minisub) = c("temperature","depth","timestamp")
-              }
-              else{
-                minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C"))]
-                names(minisub) = c("temperature","timestamp")
-              }
-            }
+            # minisub = NULL
+            # mini.ind.0 = which(mini$timestamp>set$timestamp[1])[1]
+            # mini.ind.1 = which(mini$timestamp>set$timestamp[length(set$timestamp)])[1]-1
+            # if(!(is.na(mini.ind.0) | is.na(mini.ind.0))){
+            #   minisub = mini[c(mini.ind.0:mini.ind.1),]
+            #   #### Only keep relevant data, If you encounter a minilog file
+            #   #    depth, add that column to the following line to catch that case
+            #   if("depth" %in% names(minisub)){
+            #     minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C", "depth"))]
+            #     names(minisub) = c("temperature","depth","timestamp")
+            #   }
+            #   else{
+            #     minisub = minisub[,which(names(minisub) %in% c("datetime", "TEMP_C"))]
+            #     names(minisub) = c("temperature","timestamp")
+            #   }
+            # }
 
             seabsub = NULL
             #Get seabird indicies and extend ?? mins on either side so that depth profile isn't cut off
@@ -228,7 +228,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
             }
 
             if(is.null(seabsub) && is.null(minisub))stop(paste("No temperature/depth file found for trip - set:  ", unique(na.omit(set$Trip)), " - ", unique(na.omit(set$Setno)), sep=""))
-            if(is.null(seabsub)) seabsub = minisub
+        #    if(is.null(seabsub)) seabsub = minisub
             #Remove depths = <0 #Not sure why but came accross stations with low depth values mixed in with real bottom depths.
             seabsub$depth[which(seabsub$depth <= 2)] = NA
 
@@ -295,9 +295,11 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
             mergset$doorspread = mergset$wingspread
 
             #Try to recover from user termination in order to write the current stat list to file
+
             tryCatch(
               {
                # print(mergset$depth)
+               browser()
                 bc = netmensuration::bottom.contact(mergset, bcp, debugrun=FALSE )
 
                 if ( is.null(bc) || ( !is.null(bc$res)  && ( ( !is.finite(bc$res$t0 ) || !is.finite(bc$res$t1 ) ) ) )) {
@@ -305,16 +307,26 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
                   bc = netmensuration::bottom.contact(mergset, bcp, debugrun=FALSE )
                 }
                 if ( is.null(bc) || ( !is.null(bc$res) && ( ( !is.finite(bc$res$t0 ) || !is.finite(bc$res$t1 ) ) ) )) {
-                  M$depth = jitter( M$depth, amount = bcp$eps.depth/10 )
-                  bcp$noisefilter.inla.h = 0.1
+                  mergset$depth = jitter( mergset$depth, amount = bcp$eps.depth/10 )
+                  bcp$noisefilter.inlah.h = 0.1
                   bc = netmensuration::bottom.contact(mergset, bcp, debugrun=FALSE )
                 }
                 if ( is.null(bc) || ( !is.null(bc$res) && ( ( !is.finite(bc$res$t0 ) || !is.finite(bc$res$t1 ) ) ) )) {
-                  M$depth = jitter( M$depth, amount = bcp$eps.depth/10 )
+                  mergset$depth = jitter( mergset$depth, amount = bcp$eps.depth/10 )
                   bcp$noisefilter.inla.h = 0.25
                   bc = netmensuration::bottom.contact(mergset, bcp, debugrun=FALSE )
-
                 }
+                if ( is.null(bc) || ( !is.null(bc$res) && ( ( !is.finite(bc$res$t0 ) || !is.finite(bc$res$t1 ) ) ) )) {
+                for(i in 1:5){
+                  if ( is.null(bc) || ( !is.null(bc$res) && ( ( !is.finite(bc$res$t0 ) || !is.finite(bc$res$t1 ) ) ) )) {
+                  eps.depth.backup = bcp$eps.depth
+                  bcp$eps.depth = bcp$eps.depth - 0.01
+                  bc = netmensuration::bottom.contact(mergset, bcp, debugrun=FALSE )
+                  }
+                 }
+                }
+                eps.depth.final = bcp$eps.depth
+                bcp$eps.depth = eps.depth.backup
                 message(paste("Clicktouchdown file updated in: ", pkg.env$manual.archive, sep=""))
 
               },
@@ -327,8 +339,7 @@ ilts.format.merge = function(update = TRUE, user = "", years = ""){
 
 
             if ( is.null(bc) || ( !is.null(bc$res) && ( ( !is.finite(bc$res$t0 ) || !is.finite(bc$res$t1 ) ) ) )) {
-              warning(paste("Set:",unique(na.omit(set$Setno))," Trip:", unique(na.omit(set$Trip)), " Touchdown metrics could not be calculated.", sep = ""))
-
+              warning(paste("Set:",unique(na.omit(set$Setno))," Trip:", unique(na.omit(set$Trip)), " Touchdown metrics could not be calculated. Possible reason: tow may be too shallow, resulting in too little variation in depth values; check that sd(mergset$depth) > bcp$eps.depth, currently function tries reducing eps.depth as low as ",eps.depth.final," before quitting", sep = ""), immediate. = TRUE)
             }
 
             iltsStats[[paste(unique(na.omit(set$Trip)), unique(na.omit(set$Setno)),sep=".")]] = bc
@@ -363,5 +374,5 @@ format.lol = function(x = NULL){
 
 #####Execute
 
-#ilts.format.merge(update = TRUE, user = "geraint", years = "2019" )
+ilts.format.merge(update = FALSE, user = "geraint", years = "2020" )
 
